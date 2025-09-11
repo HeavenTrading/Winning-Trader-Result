@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Daily Results Builder – Winning Trader</title>
+<style>
+  :root{--bg:#0b1220;--panel:#111a2c;--muted:#8aa0c9;--text:#e8f0ff;--accent:#55d6a9;--primary:#7aa2ff;--danger:#ff6b6b;--warn:#ffd166}
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b1220,#0e1832);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+  h1{font-size:clamp(22px,3vw,32px);margin:0 0 8px}
+  .sub{color:var(--muted);margin:0 0 16px}
+  .card{background:var(--panel);border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:16px}
+  .grid{display:grid;gap:12px}
+  .cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media (max-width:900px){.cols-2,.cols-3{grid-template-columns:1fr}}
+  label{font-size:12px;color:var(--muted)}
+  input,select,button,textarea{font:inherit}
+  input[type="date"],input[type="number"],input[type="text"],select,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0f1830;color:var(--text);outline:none}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .btn{padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#101a34;color:var(--text);cursor:pointer}
+  .btn.primary{background:linear-gradient(180deg,#6aa6ff,#4977ff);border-color:#4b79ff}
+  .btn.ghost{background:transparent}
+  .kpi{background:#0e1730;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px}
+  .kpi .v{font-size:18px;font-weight:800}
+  .hr{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);margin:14px 0}
+  .note{font-size:12px;color:var(--muted)}
+  .pair{padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:#0e1730}
+  .pair h3{margin:0 0 6px;font-size:16px}
+  .pill{font-size:12px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+  textarea#preview{height:420px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🧱 Daily Results Builder – 4 Pairs</h1>
+    <p class="sub">Select outcomes for XAUUSD, US30, USDJPY, USDZAR. The tool keeps <b>days since last loss</b> automatically (saved in your browser). Then click <b>Generate</b> and <b>Copy</b> to post on Telegram.</p>
+
+    <div class="card">
+      <div class="grid cols-3">
+        <div>
+          <label>Report date</label>
+          <input id="reportDate" type="date" />
+        </div>
+        <div>
+          <label>Headline prefix</label>
+          <input id="headlinePrefix" type="text" value="📊 Results for"/>
+        </div>
+        <div class="row" style="align-items:flex-end">
+          <button class="btn" id="todayBtn">Today</button>
+          <button class="btn" id="yesterdayBtn">Yesterday</button>
+          <span class="pill">Data is stored locally (no server)</span>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div id="pairs" class="grid cols-2"></div>
+
+      <div class="hr"></div>
+
+      <div class="grid cols-2">
+        <div>
+          <label>Footer / Disclaimer (editable)</label>
+          <textarea id="footer" rows="14" spellcheck="false">Our strategy consistently achieves a 98% Take Profit (TP) rate by counting winning days.
+
+We don’t rely on words or screenshots — we prove it! Test our FREE daily Gold signals provided on this channel, and see how they work directly in your own trading account. Few in the industry offer such transparency and opportunity! 🌟
+
+📈 We win regardless of market direction:
+Whether the market goes up or down, we maintain a remarkable 98% win rate, counting winning days‼️✅
+ 
+The posted results are only a demonstration of how the EA works. The results depend on the risk chosen by each trader in the input. ✅
+* We declare it a Day Loss when both the Initial Order and the Cover hit the Stop Loss or a significant loss during live trading periods according to the user guide. 📉
+(for more details, please check the pinned message: The "Winning Trader Strategy"). 📌
+
+💼 Start winning today:
+1️⃣ Place trades manually for free using our daily signals.
+2️⃣ Prefer automation? Let our EA Winning Trader handle trades for you effortlessly!
+3️⃣ Learn how to win: Purchase the Manual Strategy Document, which explains the proven methodology behind the Winning Trader EA.
+4️⃣ Discover premium entry points: Use the specially designed Heaven Range-Time Box Indicator to perfect your trades like a pro.
+
+📩 Contact @WinningTradersSupport for more details.
+*⚠️ Trade responsibly! Past performance does not guarantee future results. Never risk more than you can afford to lose!</textarea>
+        </div>
+        <div>
+          <div class="kpi">
+            <div class="note">Quick summary icons</div>
+            <div class="v" id="summaryIcons">—</div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" id="gen">Generate message</button>
+            <button class="btn" id="copy">Copy</button>
+            <button class="btn ghost" id="resetAll">Reset storage</button>
+          </div>
+          <div class="hr"></div>
+          <label>Telegram preview</label>
+          <textarea id="preview"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const $ = (s)=>document.querySelector(s);
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const todayISO = ()=> new Date().toISOString().slice(0,10);
+function ymd(d){ return d.toISOString().slice(0,10); }
+function fmtDateDMY(iso){ const [Y,M,D]=iso.split('-'); return `${D}-${MONTHS[+M-1]}-${Y}`; }
+function daysBetweenISO(iso1, iso2){ const a=new Date(iso1+'T00:00:00Z'); const b=new Date(iso2+'T00:00:00Z'); return Math.floor((b-a)/86400000); }
+
+const PAIRS = [
+  { key:'XAUUSD', label:'XAUUSD (Gold)' },
+  { key:'US30', label:'US30 (Dow Jones)' },
+  { key:'USDJPY', label:'USDJPY' },
+  { key:'USDZAR', label:'USDZAR' },
+];
+
+const STATUSES = [
+  {id:'win', label:'Win ‼️✅️', icon:'✅️'},
+  {id:'bigwin', label:'Big Win ‼️✅️', icon:'✅️'},
+  {id:'loss', label:'Loss day ‼️❌', icon:'❌', countsLoss:true},
+  {id:'range', label:'Range Exceeded avoid trade today ‼️♻️', icon:'♻️'},
+  {id:'close_small', label:'Reaching close time with a small loss ❗️🟡', icon:'🟡'},
+  {id:'close_loss', label:'Reaching close time with a loss ❗️🔻', icon:'❌', countsLoss:true},
+];
+
+function loadLS(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def; }catch(e){ return def; } }
+function saveLS(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+function pairCard(p){
+  const lastLoss = loadLS('WTC_lastLoss_'+p.key, null);
+  const summer = loadLS('WTC_summer_'+p.key, {enabled:false, start: null});
+  const status = loadLS('WTC_status_'+p.key, 'win');
+
+  const div = document.createElement('div');
+  div.className = 'pair';
+  div.innerHTML = `
+    <h3>${p.label}</h3>
+    <div class="grid cols-2">
+      <div>
+        <label>Status</label>
+        <select id="st_${p.key}">
+          ${STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="row" style="justify-content:space-between"><span>Count toward "Last loss day*"</span><input id="markLoss_${p.key}" type="checkbox"></label>
+        <div class="note">If checked and today is a loss, the counter updates to the report date.</div>
+      </div>
+    </div>
+    <div class="grid cols-3" style="margin-top:8px">
+      <div>
+        <label>Last loss date (stored)</label>
+        <input id="lossDate_${p.key}" type="date" />
+        <div class="row" style="margin-top:6px">
+          <button class="btn" id="setLossToday_${p.key}">Set to report date</button>
+          <button class="btn ghost" id="clearLoss_${p.key}">Clear</button>
+        </div>
+      </div>
+      <div class="kpi"><div class="note">Days since last loss</div><div class="v" id="since_${p.key}">—</div></div>
+      <div>
+        <label class="row" style="justify-content:space-between"><span>Summer Period note</span><input id="summerOn_${p.key}" type="checkbox"></label>
+        <input id="summerStart_${p.key}" type="date" />
+        <div class="note">Outputs “(N days ago Summer Period)” if enabled.</div>
+      </div>
+    </div>
+  `;
+
+  // set initial values
+  div.querySelector('#st_'+p.key).value = status;
+  const st = STATUSES.find(s=>s.id===status);
+  div.querySelector('#markLoss_'+p.key).checked = !!st?.countsLoss;
+  if(lastLoss) div.querySelector('#lossDate_'+p.key).value = lastLoss;
+  div.querySelector('#summerOn_'+p.key).checked = !!summer?.enabled;
+  if(summer?.start) div.querySelector('#summerStart_'+p.key).value = summer.start;
+
+  // wire
+  div.querySelector('#st_'+p.key).addEventListener('change',(e)=>{
+    const id = e.target.value; saveLS('WTC_status_'+p.key, id);
+    const st = STATUSES.find(s=>s.id===id);
+    div.querySelector('#markLoss_'+p.key).checked = !!st?.countsLoss; updateSince(p.key);
+  });
+  div.querySelector('#markLoss_'+p.key).addEventListener('change',()=>{ /* just UI */ });
+  div.querySelector('#lossDate_'+p.key).addEventListener('change',(e)=>{ saveLS('WTC_lastLoss_'+p.key, e.target.value||null); updateSince(p.key); });
+  div.querySelector('#setLossToday_'+p.key).addEventListener('click',()=>{ const d=$('#reportDate').value; if(!d){alert('Pick a report date');return;} div.querySelector('#lossDate_'+p.key).value=d; saveLS('WTC_lastLoss_'+p.key,d); updateSince(p.key); });
+  div.querySelector('#clearLoss_'+p.key).addEventListener('click',()=>{ div.querySelector('#lossDate_'+p.key).value=''; saveLS('WTC_lastLoss_'+p.key,null); updateSince(p.key); });
+  div.querySelector('#summerOn_'+p.key).addEventListener('change',(e)=>{ const obj=loadLS('WTC_summer_'+p.key,{enabled:false,start:null}); obj.enabled=e.target.checked; saveLS('WTC_summer_'+p.key,obj); updateSince(p.key); });
+  div.querySelector('#summerStart_'+p.key).addEventListener('change',(e)=>{ const obj=loadLS('WTC_summer_'+p.key,{enabled:false,start:null}); obj.start=e.target.value||null; saveLS('WTC_summer_'+p.key,obj); updateSince(p.key); });
+
+  return div;
+}
+
+function updateSince(key){
+  const rep = $('#reportDate').value || todayISO();
+  let lastLoss = loadLS('WTC_lastLoss_'+key, null);
+  const el = document.querySelector('#since_'+key);
+  if(lastLoss){
+    let diff = daysBetweenISO(lastLoss, rep);
+    if(diff < 0){
+      // If future date slipped in, correct using seed (aligns with your message) or clamp to 0
+      const n = SEED.lastLossDays[key];
+      if(typeof n==='number'){
+        const corrected = isoMinusDays(SEED.baseDate, n);
+        saveLS('WTC_lastLoss_'+key, corrected);
+        const input = document.querySelector('#lossDate_'+key); if(input) input.value = corrected;
+        diff = daysBetweenISO(corrected, rep);
+      } else {
+        diff = 0;
+      }
+    }
+    el.textContent = diff + ' days';
+  }
+  else { el.textContent = '—'; }
+}
+
+// ====== Seed defaults from your 10-Sep-2025 post ======
+const SEED = {
+  baseDate: '2025-09-10',
+  lastLossDays: { XAUUSD:357, US30:134, USDJPY:133, USDZAR:132 },
+  summerDays: { XAUUSD:11, US30:94, USDJPY:null, USDZAR:13 }
+};
+function isoMinusDays(iso, n){ const d=new Date(iso+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-n); return d.toISOString().slice(0,10); }
+function seedDefaultsIfEmpty(){
+  PAIRS.forEach(p=>{
+    const lk = 'WTC_lastLoss_'+p.key;
+    if(localStorage.getItem(lk)===null){
+      const n = SEED.lastLossDays[p.key];
+      if(typeof n==='number'){ saveLS(lk, isoMinusDays(SEED.baseDate, n)); }
+    }
+    const sk = 'WTC_summer_'+p.key;
+    if(localStorage.getItem(sk)===null){
+      const n = SEED.summerDays[p.key];
+      const obj = { enabled: true, start: (typeof n==='number' ? isoMinusDays(SEED.baseDate, n) : null) };
+      saveLS(sk, obj);
+    }
+    const stk = 'WTC_status_'+p.key;
+    if(localStorage.getItem(stk)===null){
+      // Default status for ALL pairs → Win
+      saveLS(stk, 'win');
+    }
+  });
+}
+
+// Force-sync to your 10-Sep-2025 message for XAUUSD & US30 (fixes negative day counts if prior test data exists)
+function forceSeedForMessage(){
+  // Align last-loss and summer notes with your 10-Sep-2025 post for XAUUSD & US30
+  const rep = SEED.baseDate;
+  const desiredLoss = {
+    XAUUSD: isoMinusDays(rep, SEED.lastLossDays.XAUUSD),
+    US30:   isoMinusDays(rep, SEED.lastLossDays.US30)
+  };
+  const desiredSummer = {
+    XAUUSD: { enabled:true, start: isoMinusDays(rep, SEED.summerDays.XAUUSD) },
+    US30:   { enabled:true, start: isoMinusDays(rep, SEED.summerDays.US30) }
+  };
+  // Apply idempotently; do NOT override statuses (user choice). Defaults handled elsewhere.
+  saveLS('WTC_lastLoss_XAUUSD', desiredLoss.XAUUSD);
+  saveLS('WTC_lastLoss_US30',   desiredLoss.US30);
+  saveLS('WTC_summer_XAUUSD',   desiredSummer.XAUUSD);
+  saveLS('WTC_summer_US30',     desiredSummer.US30);
+}
+
+function renderPairs(){
+  const cont = $('#pairs'); cont.innerHTML='';
+  PAIRS.forEach(p=>{ cont.appendChild(pairCard(p)); updateSince(p.key); });
+}
+
+function setReportDate(iso){ $('#reportDate').value = iso; PAIRS.forEach(p=>updateSince(p.key)); }
+
+function summaryIconForStatus(id){
+  const s = STATUSES.find(x=>x.id===id); return s?.icon || '•';
+}
+
+function generate(){
+  const rep = $('#reportDate').value || todayISO();
+  const repDMY = fmtDateDMY(rep);
+
+  // If a pair is marked as loss today, update last loss to report date
+  PAIRS.forEach(p=>{
+    const st = loadLS('WTC_status_'+p.key, 'win');
+    const mark = document.querySelector('#markLoss_'+p.key)?.checked;
+    if(mark){ saveLS('WTC_lastLoss_'+p.key, rep); const input=document.querySelector('#lossDate_'+p.key); if(input) input.value=rep; }
+    updateSince(p.key);
+  });
+
+  let lines = [];
+  let icons = [];
+  PAIRS.forEach(p=>{
+    const stId = loadLS('WTC_status_'+p.key, 'win');
+    const st = STATUSES.find(s=>s.id===stId);
+    let lastLoss = loadLS('WTC_lastLoss_'+p.key, null);
+    const summer = loadLS('WTC_summer_'+p.key, {enabled:false,start:null});
+    let diffTxt = 'N/A';
+    if(lastLoss){
+      let d = daysBetweenISO(lastLoss, rep);
+      if(d < 0){
+        // fix using seed if available
+        const n = SEED.lastLossDays[p.key];
+        if(typeof n==='number'){
+          const corrected = isoMinusDays(SEED.baseDate, n);
+          saveLS('WTC_lastLoss_'+p.key, corrected);
+          const input=document.querySelector('#lossDate_'+p.key); if(input) input.value=corrected;
+          d = daysBetweenISO(corrected, rep);
+        } else { d = 0; }
+      }
+      diffTxt = `${d} days ago`;
+    }
+
+    let line = `🔹 ${p.key}:  ${st.label}`;
+    line += ` (Last loss day*: ${diffTxt})`;
+    if(summer?.enabled && summer?.start){
+      const d = daysBetweenISO(summer.start, rep);
+      line += ` (${d} day ago Summer Period)`;
+    }
+    lines.push(line);
+    icons.push(summaryIconForStatus(stId));
+  });
+
+  // Build final message
+  const head = `${$('#headlinePrefix').value} ${repDMY}:`;
+  const block1 = lines.join('\n');
+  const iconRow = icons.join('');
+  const footer = $('#footer').value.trim();
+
+  const msg = `${head}\n\n${block1}\n\n${iconRow}\n\n\n${footer}`;
+  $('#preview').value = msg;
+  $('#summaryIcons').textContent = iconRow || '—';
+}
+
+function copy(){
+  navigator.clipboard.writeText($('#preview').value).then(()=>{
+    const b=$('#copy'); b.textContent='Copied! ✅'; setTimeout(()=>b.textContent='Copy',900);
+  }).catch(()=>alert('Cannot copy.'));
+}
+
+// Reset storage
+function resetAll(){ if(confirm('Clear stored last-loss dates, statuses and summer notes?')){ ['status','lastLoss','summer'].forEach(type=>{ PAIRS.forEach(p=> localStorage.removeItem('WTC_'+type+'_'+p.key)); }); renderPairs(); generate(); } }
+
+// INIT
+seedDefaultsIfEmpty();
+forceSeedForMessage();
+renderPairs();
+setReportDate(SEED.baseDate);
+$('#todayBtn').addEventListener('click',()=> setReportDate(todayISO()));
+$('#yesterdayBtn').addEventListener('click',()=>{ const d=new Date(); d.setDate(d.getDate()-1); setReportDate(ymd(d)); });
+$('#gen').addEventListener('click', generate);
+$('#copy').addEventListener('click', copy);
+$('#resetAll').addEventListener('click', resetAll);
+
+// Auto-generate once at start
+generate();
+</script>
+</body>
+</html>
